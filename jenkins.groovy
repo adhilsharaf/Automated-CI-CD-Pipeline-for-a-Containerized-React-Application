@@ -66,7 +66,7 @@ pipeline {
 
         stage('Run Trivy Security Scan') {
             steps {
-                bat 'trivy image %IMAGE_NAME%:%IMAGE_TAG%'
+              bat '"C:\\Users\\adh11\\AppData\\Local\\Microsoft\\WinGet\\Packages\\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe\\trivy.exe" image %IMAGE_NAME%:%IMAGE_TAG%'
             }
         }
 
