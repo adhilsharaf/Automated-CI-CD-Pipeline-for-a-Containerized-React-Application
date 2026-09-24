@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-      IMAGE_NAME = "kopilnagi/react-demo-docker"
+      IMAGE_NAME = "adhilsharaf/react-demo"
       IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -18,76 +18,69 @@ pipeline {
           }
         }
         stage('Checkout') {
-            steps {
-                git branch: 'main',
-                  credentialsId: 'GitHub-ssh-new',
-                  url: 'git@github.com:kapilnagi007/My-First-Repo.git'
-            }
-        }
-        stage('Install Dependencies'){
-          steps{
-            sh 'npm install -- force'
+        steps {
+          checkout scm
           }
+        }
+        stage('Install Dependencies') {
+        steps {
+          dir('react-demo') {
+            bat 'npm install'
+          }
+         } 
         }
 
         stage('Sonar Scan') {
-          steps {
-            script{
-              def scannerHome = tool 'sonar-scanner'
-
-              withSonarQubeEnv('sonarqube') {
-                sh '${scannerHome}/bin/sonar-scanner'
+        steps {
+        withSonarQubeEnv('sonarqube') {
+            withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                dir('react-demo') {
+                    bat 'sonar-scanner -Dsonar.token=%SONAR_TOKEN%'
+                 }
+               }
               }
             }
-          }
         }
         
-        stage('Test Docker'){
-          steps {
-            sh 'docker ps'
-          }
+        stage('Test Docker') {
+        steps {
+           bat 'docker ps'
+         }
         }
 
-        stage('Debug') {
-          steps {
-            sh 'pwd'
-            sh 'ls -la'
-          }
-        } 
+       stage('Debug') {
+       steps {
+          bat 'cd'
+          bat 'dir'
+        }
+      }
 
         stage('Build Docker Image') {
-          steps{
-            sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG -f react-demo/Dockerfile react-demo'
+        steps {
+           bat 'docker build -t %IMAGE_NAME%:%IMAGE_TAG% -f react-demo/Dockerfile react-demo'
           }
         }
         stage('Install & Run Trivy') {
-            steps {
-                script {
-                    // Downloads the standalone binary directly to the workspace without needing root access
-                    sh 'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .'
-                    
-                    // Execute the scan using the local binary (./trivy)
-                    sh './trivy image $IMAGE_NAME:$IMAGE_TAG'
-                }
-            }
+        steps {
+            bat 'trivy image %IMAGE_NAME%:%IMAGE_TAG%'
+          }
         }
 
         stage('Push Image') {
-          steps {
+        steps {
             withCredentials([
-              usernamePassword(
+            usernamePassword(
                 credentialsId: 'dockerhub-creds',
                 usernameVariable: 'DOCKER_USER',
                 passwordVariable: 'DOCKER_PASS'
               )
-            ])
-            {
-              sh '''
-              echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-              docker push $IMAGE_NAME:$IMAGE_TAG
-              '''
-            }
-          }
+          ]) {
+              bat '''
+                echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                docker push %IMAGE_NAME%:%IMAGE_TAG%
+            '''
+           }
+         }
         }
 
         stage('Deploy'){
